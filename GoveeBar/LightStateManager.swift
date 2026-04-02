@@ -3,30 +3,40 @@ import Combine
 import os.log
 
 /// Combines display and lock signals to determine desired light state,
-/// and sends commands to Govee devices via LAN.
+/// and sends commands to Govee devices via LAN with cloud API fallback.
 @MainActor
 final class LightStateManager: ObservableObject {
+    enum ControlMethod: String, CaseIterable {
+        case lan = "LAN"
+        case cloud = "Cloud API"
+        case auto = "Auto (LAN → Cloud)"
+    }
+
     @Published private(set) var lightsOn = false
     @Published private(set) var displayConnected = false
     @Published private(set) var screenLocked = false
     @Published private(set) var devices: [GoveeLANController.Device] = []
     @Published private(set) var selectedDeviceID: String?
     @Published private(set) var isDiscovering = false
+    @Published private(set) var lastError: String?
 
     @Published var automaticControlEnabled = true {
         didSet { evaluateState() }
     }
 
+    @Published var controlMethod: ControlMethod = .auto {
+        didSet {
+            UserDefaults.standard.set(controlMethod.rawValue, forKey: "controlMethod")
+        }
+    }
+
     private let displayMonitor = DisplayMonitor()
     private let lockMonitor = LockMonitor()
     private let lanController = GoveeLANController()
+    private let cloudController = GoveeCloudController()
     private let logger = Logger(subsystem: "com.govee-bar", category: "state")
 
-    /// Manual override — when set, ignores automatic control until the next
-    /// automatic state change clears it.
     private var manualOverride: Bool?
-
-    /// Timer for periodic device re-discovery
     private var rediscoveryTimer: Timer?
 
     init() {
@@ -38,17 +48,51 @@ final class LightStateManager: ObservableObject {
             self?.handleLockChanged(locked)
         }
 
-        // Restore selected device from UserDefaults
+        // Restore preferences
         selectedDeviceID = UserDefaults.standard.string(forKey: "selectedDeviceID")
+        if let saved = UserDefaults.standard.string(forKey: "controlMethod"),
+           let method = ControlMethod(rawValue: saved) {
+            controlMethod = method
+        }
+
+        // Load API key from Keychain
+        Task {
+            if let apiKey = KeychainHelper.loadAPIKey() {
+                await cloudController.setAPIKey(apiKey)
+            }
+        }
 
         displayMonitor.start()
         lockMonitor.start()
 
-        // Discover devices on launch
         Task {
             await discoverDevices()
             startPeriodicRediscovery()
         }
+    }
+
+    // MARK: - API Key
+
+    func setAPIKey(_ key: String) {
+        do {
+            try KeychainHelper.saveAPIKey(key)
+            Task { await cloudController.setAPIKey(key) }
+            lastError = nil
+            logger.info("API key saved to Keychain")
+        } catch {
+            lastError = error.localizedDescription
+            logger.error("Failed to save API key: \(error.localizedDescription)")
+        }
+    }
+
+    func clearAPIKey() {
+        KeychainHelper.deleteAPIKey()
+        Task { await cloudController.setAPIKey(nil) }
+        logger.info("API key cleared")
+    }
+
+    var hasAPIKey: Bool {
+        KeychainHelper.loadAPIKey() != nil
     }
 
     // MARK: - Device Discovery
@@ -60,14 +104,15 @@ final class LightStateManager: ObservableObject {
         do {
             let found = try await lanController.discoverDevices(timeout: 3.0)
             devices = found
+            lastError = nil
             logger.info("Found \(found.count) device(s)")
 
-            // Auto-select if only one device found and none selected
             if selectedDeviceID == nil, let first = found.first {
                 selectDevice(first.id)
             }
         } catch {
             logger.error("Discovery failed: \(error.localizedDescription)")
+            lastError = "Discovery failed: \(error.localizedDescription)"
         }
     }
 
@@ -133,6 +178,8 @@ final class LightStateManager: ObservableObject {
         }
     }
 
+    // MARK: - Command Dispatch
+
     private func sendLightCommand(on: Bool) async {
         guard let deviceID = selectedDeviceID,
               let device = devices.first(where: { $0.id == deviceID }) else {
@@ -140,15 +187,46 @@ final class LightStateManager: ObservableObject {
             return
         }
 
+        switch controlMethod {
+        case .lan:
+            await sendViaLAN(on: on, device: device)
+        case .cloud:
+            await sendViaCloud(on: on, device: device)
+        case .auto:
+            await sendViaLAN(on: on, device: device, cloudFallback: true)
+        }
+    }
+
+    private func sendViaLAN(on: Bool, device: GoveeLANController.Device, cloudFallback: Bool = false) async {
         do {
             if on {
                 try await lanController.turnOn(device: device)
             } else {
                 try await lanController.turnOff(device: device)
             }
+            lastError = nil
         } catch {
-            logger.error("Failed to \(on ? "turn on" : "turn off") lights: \(error.localizedDescription)")
-            // TODO: M3 — Cloud API fallback
+            logger.error("LAN failed: \(error.localizedDescription)")
+            if cloudFallback {
+                logger.info("Falling back to cloud API")
+                await sendViaCloud(on: on, device: device)
+            } else {
+                lastError = "LAN: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func sendViaCloud(on: Bool, device: GoveeLANController.Device) async {
+        do {
+            if on {
+                try await cloudController.turnOn(sku: device.sku, device: device.id)
+            } else {
+                try await cloudController.turnOff(sku: device.sku, device: device.id)
+            }
+            lastError = nil
+        } catch {
+            logger.error("Cloud failed: \(error.localizedDescription)")
+            lastError = "Cloud: \(error.localizedDescription)"
         }
     }
 }
