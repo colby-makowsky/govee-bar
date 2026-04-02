@@ -38,6 +38,7 @@ final class LightStateManager: ObservableObject {
 
     private var manualOverride: Bool?
     private var rediscoveryTimer: Timer?
+    private var statusPollTimer: Timer?
 
     init() {
         displayMonitor.onDisplayChanged = { [weak self] connected in
@@ -68,6 +69,7 @@ final class LightStateManager: ObservableObject {
         Task {
             await discoverDevices()
             startPeriodicRediscovery()
+            startStatusPolling()
         }
     }
 
@@ -127,6 +129,38 @@ final class LightStateManager: ObservableObject {
             Task { @MainActor [weak self] in
                 await self?.discoverDevices()
             }
+        }
+    }
+
+    /// Polls the selected device for its current on/off state every 10 seconds.
+    /// Picks up changes made via the Govee app, physical controls, etc.
+    private func startStatusPolling() {
+        statusPollTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.pollDeviceStatus()
+            }
+        }
+    }
+
+    private func pollDeviceStatus() async {
+        guard let deviceID = selectedDeviceID,
+              let device = devices.first(where: { $0.id == deviceID }) else { return }
+
+        do {
+            guard let response = try await lanController.getStatus(device: device),
+                  let msg = response["msg"] as? [String: Any],
+                  let cmd = msg["cmd"] as? String, cmd == "devStatus",
+                  let data = msg["data"] as? [String: Any],
+                  let onOff = data["onOff"] as? Int else { return }
+
+            let deviceIsOn = onOff == 1
+            if deviceIsOn != lightsOn {
+                logger.info("External state change detected: lights \(deviceIsOn ? "ON" : "OFF")")
+                lightsOn = deviceIsOn
+                manualOverride = deviceIsOn
+            }
+        } catch {
+            // Status poll failures are expected (e.g. device asleep), don't log as errors
         }
     }
 
