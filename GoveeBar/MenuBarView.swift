@@ -17,6 +17,37 @@ struct MenuBarView: View {
         Text("Lights: \(stateManager.lightsOn ? "On" : "Off")")
         Text("Screen: \(stateManager.screenLocked ? "Locked" : "Unlocked")")
 
+        if let deviceID = stateManager.selectedDeviceID,
+           let device = stateManager.devices.first(where: { $0.id == deviceID }) {
+            Text("Device: \(device.displayName)")
+        } else {
+            Text("Device: None")
+        }
+
+        Divider()
+
+        Button {
+            Task {
+                await stateManager.discoverDevices()
+            }
+        } label: {
+            Text(stateManager.isDiscovering ? "Discovering..." : "Discover Devices")
+        }
+        .disabled(stateManager.isDiscovering)
+
+        if !stateManager.devices.isEmpty {
+            Menu("Select Device") {
+                ForEach(stateManager.devices) { device in
+                    Button {
+                        stateManager.selectDevice(device.id)
+                    } label: {
+                        let selected = device.id == stateManager.selectedDeviceID
+                        Text("\(selected ? "✓ " : "")\(device.displayName)")
+                    }
+                }
+            }
+        }
+
         Divider()
 
         SettingsLink {

@@ -55,7 +55,7 @@ final class DisplayMonitor {
             let vendorID = CGDisplayVendorNumber(displayID)
 
             // Apple Studio Display has vendor ID 0x610 (Apple) and is an external display
-            if vendorID == appleVendorID && !CGDisplayIsBuiltin(displayID).boolValue {
+            if vendorID == appleVendorID && CGDisplayIsBuiltin(displayID) == 0 {
                 return true
             }
         }
@@ -64,6 +64,3 @@ final class DisplayMonitor {
     }
 }
 
-private extension UInt32 {
-    var boolValue: Bool { self != 0 }
-}
