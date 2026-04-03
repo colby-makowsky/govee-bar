@@ -40,6 +40,10 @@ final class LightStateManager: ObservableObject {
     private var rediscoveryTimer: Timer?
     private var statusPollTimer: Timer?
 
+    /// Tracks whether we're applying our own command, so we can ignore
+    /// the resulting status echo from the device.
+    private var isApplyingCommand = false
+
     init() {
         displayMonitor.onDisplayChanged = { [weak self] connected in
             self?.handleDisplayChanged(connected)
@@ -63,6 +67,15 @@ final class LightStateManager: ObservableObject {
             }
         }
 
+        // Set up event-driven status updates from LAN controller
+        Task {
+            await lanController.setStatusCallback { [weak self] status in
+                Task { @MainActor [weak self] in
+                    self?.handleDeviceStatusUpdate(status)
+                }
+            }
+        }
+
         displayMonitor.start()
         lockMonitor.start()
 
@@ -70,6 +83,46 @@ final class LightStateManager: ObservableObject {
             await discoverDevices()
             startPeriodicRediscovery()
             startStatusPolling()
+        }
+    }
+
+    // MARK: - Device Status (Event-Driven)
+
+    private func handleDeviceStatusUpdate(_ status: GoveeLANController.DeviceStatus) {
+        // Ignore echoes from our own commands
+        guard !isApplyingCommand else { return }
+
+        // Only react to status from the selected device
+        guard let selectedID = selectedDeviceID,
+              status.deviceId == selectedID else { return }
+
+        if status.isOn != lightsOn {
+            logger.info("External state change detected: lights \(status.isOn ? "ON" : "OFF")")
+            lightsOn = status.isOn
+            manualOverride = status.isOn
+        }
+    }
+
+    /// Periodically requests device status as a complement to event-driven updates.
+    /// Some state changes may not trigger a broadcast, so this catches stragglers.
+    private func startStatusPolling() {
+        statusPollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.pollDeviceStatus()
+            }
+        }
+    }
+
+    private func pollDeviceStatus() async {
+        guard let deviceID = selectedDeviceID,
+              let device = devices.first(where: { $0.id == deviceID }) else { return }
+
+        do {
+            // This sends a devStatus request; the response arrives at the
+            // persistent listener and triggers handleDeviceStatusUpdate
+            try await lanController.requestStatus(device: device)
+        } catch {
+            // Poll failures are expected occasionally, don't surface as errors
         }
     }
 
@@ -132,38 +185,6 @@ final class LightStateManager: ObservableObject {
         }
     }
 
-    /// Polls the selected device for its current on/off state every 10 seconds.
-    /// Picks up changes made via the Govee app, physical controls, etc.
-    private func startStatusPolling() {
-        statusPollTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.pollDeviceStatus()
-            }
-        }
-    }
-
-    private func pollDeviceStatus() async {
-        guard let deviceID = selectedDeviceID,
-              let device = devices.first(where: { $0.id == deviceID }) else { return }
-
-        do {
-            guard let response = try await lanController.getStatus(device: device),
-                  let msg = response["msg"] as? [String: Any],
-                  let cmd = msg["cmd"] as? String, cmd == "devStatus",
-                  let data = msg["data"] as? [String: Any],
-                  let onOff = data["onOff"] as? Int else { return }
-
-            let deviceIsOn = onOff == 1
-            if deviceIsOn != lightsOn {
-                logger.info("External state change detected: lights \(deviceIsOn ? "ON" : "OFF")")
-                lightsOn = deviceIsOn
-                manualOverride = deviceIsOn
-            }
-        } catch {
-            // Status poll failures are expected (e.g. device asleep), don't log as errors
-        }
-    }
-
     // MARK: - Light Toggle
 
     func toggleLights() {
@@ -219,6 +240,16 @@ final class LightStateManager: ObservableObject {
               let device = devices.first(where: { $0.id == deviceID }) else {
             logger.warning("No device selected, skipping command")
             return
+        }
+
+        // Flag so we ignore the status echo from our own command
+        isApplyingCommand = true
+        defer {
+            // Clear after a short delay to allow the echo to pass
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                self?.isApplyingCommand = false
+            }
         }
 
         switch controlMethod {
