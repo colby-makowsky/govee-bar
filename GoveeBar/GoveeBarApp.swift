@@ -4,7 +4,6 @@ import Combine
 @main
 struct GoveeBarApp: App {
     @StateObject private var stateManager = LightStateManager()
-    @State private var iconName = "MenuBarIconDisabled"
 
     var body: some Scene {
         MenuBarExtra {

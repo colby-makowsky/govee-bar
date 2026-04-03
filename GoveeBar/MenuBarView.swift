@@ -2,6 +2,15 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var stateManager: LightStateManager
+    @Environment(\.openSettings) private var openSettings
+
+    private var deviceName: String {
+        if let deviceID = stateManager.selectedDeviceID,
+           let device = stateManager.devices.first(where: { $0.id == deviceID }) {
+            return device.displayName
+        }
+        return "None"
+    }
 
     var body: some View {
         Button {
@@ -16,13 +25,7 @@ struct MenuBarView: View {
         Text("Studio Display: \(stateManager.displayConnected ? "Connected" : "Not Connected")")
         Text("Lights: \(stateManager.lightsOn ? "On" : "Off")")
         Text("Screen: \(stateManager.screenLocked ? "Locked" : "Unlocked")")
-
-        if let deviceID = stateManager.selectedDeviceID,
-           let device = stateManager.devices.first(where: { $0.id == deviceID }) {
-            Text("Device: \(device.displayName)")
-        } else {
-            Text("Device: None")
-        }
+        Text("Device: \(deviceName)")
 
         Divider()
 
@@ -35,8 +38,11 @@ struct MenuBarView: View {
         }
         .disabled(stateManager.isDiscovering)
 
-        if !stateManager.devices.isEmpty {
-            Menu("Select Device") {
+        // Always show Select Device menu to keep stable item count
+        Menu("Select Device") {
+            if stateManager.devices.isEmpty {
+                Text("No devices found")
+            } else {
                 ForEach(stateManager.devices) { device in
                     Button {
                         stateManager.selectDevice(device.id)
@@ -50,8 +56,24 @@ struct MenuBarView: View {
 
         Divider()
 
-        SettingsLink {
-            Text("Settings...")
+        Button("Settings...") {
+            // Set dock icon from SF Symbol
+            if let symbol = NSImage(systemSymbolName: "lightbulb.fill", accessibilityDescription: "Govee Bar") {
+                let config = NSImage.SymbolConfiguration(pointSize: 128, weight: .regular)
+                NSApp.applicationIconImage = symbol.withSymbolConfiguration(config) ?? symbol
+            }
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+
+            // Bring existing settings window to front
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                for window in NSApp.windows {
+                    if window.isVisible && window.canBecomeKey {
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                }
+            }
         }
         .keyboardShortcut(",", modifiers: .command)
 

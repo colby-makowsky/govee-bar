@@ -21,7 +21,7 @@ final class LightStateManager: ObservableObject {
     @Published private(set) var lastError: String?
 
     @Published var automaticControlEnabled = true {
-        didSet { evaluateState() }
+        didSet { if isReady { enforceDesiredState() } }
     }
 
     @Published var controlMethod: ControlMethod = .auto {
@@ -39,6 +39,10 @@ final class LightStateManager: ObservableObject {
     private var manualOverride: Bool?
     private var rediscoveryTimer: Timer?
     private var statusPollTimer: Timer?
+
+    /// True once initial discovery + status check is done.
+    /// Prevents the state machine from acting before we know the real device state.
+    private var isReady = false
 
     /// Tracks whether we're applying our own command, so we can ignore
     /// the resulting status echo from the device.
@@ -60,13 +64,6 @@ final class LightStateManager: ObservableObject {
             controlMethod = method
         }
 
-        // Load API key from Keychain
-        Task {
-            if let apiKey = KeychainHelper.loadAPIKey() {
-                await cloudController.setAPIKey(apiKey)
-            }
-        }
-
         // Set up event-driven status updates from LAN controller
         Task {
             await lanController.setStatusCallback { [weak self] status in
@@ -76,13 +73,33 @@ final class LightStateManager: ObservableObject {
             }
         }
 
+        // Start monitoring system events (updates displayConnected/screenLocked
+        // but won't trigger commands until isReady)
         displayMonitor.start()
         lockMonitor.start()
 
+        // Startup sequence: discover → get actual device state → enforce desired state
         Task {
             await discoverDevices()
+            await syncInitialState()
+            isReady = true
+            enforceDesiredState()
             startPeriodicRediscovery()
             startStatusPolling()
+        }
+    }
+
+    /// On startup, query the device for its actual state before making decisions.
+    private func syncInitialState() async {
+        guard let deviceID = selectedDeviceID,
+              let device = devices.first(where: { $0.id == deviceID }) else { return }
+
+        do {
+            try await lanController.requestStatus(device: device)
+            // Give the listener a moment to receive the response
+            try? await Task.sleep(for: .seconds(1))
+        } catch {
+            logger.warning("Initial status check failed: \(error.localizedDescription)")
         }
     }
 
@@ -96,7 +113,11 @@ final class LightStateManager: ObservableObject {
         guard let selectedID = selectedDeviceID,
               status.deviceId == selectedID else { return }
 
-        if status.isOn != lightsOn {
+        if !isReady {
+            // During init, just sync our state to match the device — no commands
+            lightsOn = status.isOn
+            logger.info("Initial device state: \(status.isOn ? "ON" : "OFF")")
+        } else if status.isOn != lightsOn {
             logger.info("External state change detected: lights \(status.isOn ? "ON" : "OFF")")
             lightsOn = status.isOn
             manualOverride = status.isOn
@@ -128,26 +149,34 @@ final class LightStateManager: ObservableObject {
 
     // MARK: - API Key
 
-    func setAPIKey(_ key: String) {
-        do {
-            try KeychainHelper.saveAPIKey(key)
+    @Published private(set) var hasAPIKey: Bool = false
+
+    private static let apiKeyDefaultsKey = "goveeAPIKey"
+
+    func loadAPIKeyIfNeeded() {
+        if let key = UserDefaults.standard.string(forKey: Self.apiKeyDefaultsKey), !key.isEmpty {
+            hasAPIKey = true
             Task { await cloudController.setAPIKey(key) }
-            lastError = nil
-            logger.info("API key saved to Keychain")
-        } catch {
-            lastError = error.localizedDescription
-            logger.error("Failed to save API key: \(error.localizedDescription)")
         }
     }
 
+    func setAPIKey(_ key: String) {
+        UserDefaults.standard.set(key, forKey: Self.apiKeyDefaultsKey)
+        hasAPIKey = true
+        Task { await cloudController.setAPIKey(key) }
+        lastError = nil
+        logger.info("API key saved")
+    }
+
     func clearAPIKey() {
-        KeychainHelper.deleteAPIKey()
+        UserDefaults.standard.removeObject(forKey: Self.apiKeyDefaultsKey)
+        hasAPIKey = false
         Task { await cloudController.setAPIKey(nil) }
         logger.info("API key cleared")
     }
 
-    var hasAPIKey: Bool {
-        KeychainHelper.loadAPIKey() != nil
+    func storedAPIKey() -> String? {
+        UserDefaults.standard.string(forKey: Self.apiKeyDefaultsKey)
     }
 
     // MARK: - Device Discovery
@@ -188,9 +217,8 @@ final class LightStateManager: ObservableObject {
     // MARK: - Light Toggle
 
     func toggleLights() {
-        let newState = !lightsOn
-        manualOverride = newState
-        applyLightState(newState)
+        manualOverride = !lightsOn
+        enforceDesiredState()
     }
 
     // MARK: - Event Handlers
@@ -198,38 +226,39 @@ final class LightStateManager: ObservableObject {
     private func handleDisplayChanged(_ connected: Bool) {
         logger.info("Display connected: \(connected)")
         displayConnected = connected
+        guard isReady else { return }
         manualOverride = nil
-        evaluateState()
+        enforceDesiredState()
     }
 
     private func handleLockChanged(_ locked: Bool) {
         logger.info("Screen locked: \(locked)")
         screenLocked = locked
+        guard isReady else { return }
         manualOverride = nil
-        evaluateState()
+        enforceDesiredState()
     }
 
     // MARK: - State Evaluation
 
-    private func evaluateState() {
+    /// Determines the desired light state and sends a command only if the
+    /// device doesn't match. Called after events and on startup.
+    private func enforceDesiredState() {
+        let desired: Bool
         if let override = manualOverride {
-            applyLightState(override)
+            desired = override
+        } else if automaticControlEnabled {
+            desired = displayConnected && !screenLocked
+        } else {
             return
         }
 
-        guard automaticControlEnabled else { return }
+        guard lightsOn != desired else { return }
 
-        let shouldBeOn = displayConnected && !screenLocked
-        applyLightState(shouldBeOn)
-    }
-
-    private func applyLightState(_ on: Bool) {
-        guard lightsOn != on else { return }
-        lightsOn = on
-        logger.info("Lights → \(on ? "ON" : "OFF")")
-
+        lightsOn = desired
+        logger.info("Lights → \(desired ? "ON" : "OFF")")
         Task {
-            await sendLightCommand(on: on)
+            await sendLightCommand(on: desired)
         }
     }
 
@@ -282,6 +311,7 @@ final class LightStateManager: ObservableObject {
     }
 
     private func sendViaCloud(on: Bool, device: GoveeLANController.Device) async {
+        loadAPIKeyIfNeeded()
         do {
             if on {
                 try await cloudController.turnOn(sku: device.sku, device: device.id)
