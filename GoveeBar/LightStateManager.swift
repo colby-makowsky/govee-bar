@@ -190,7 +190,15 @@ final class LightStateManager: ObservableObject {
 
         do {
             let found = try await lanController.discoverDevices(timeout: 3.0)
-            devices = found
+
+            if found.isEmpty && !devices.isEmpty {
+                // Keep existing device list on a failed scan — likely transient
+                logger.warning("Scan returned 0 devices, keeping existing list. Retrying in 10s.")
+                scheduleRetryDiscovery()
+            } else {
+                devices = found
+            }
+
             lastError = nil
             logger.info("Found \(found.count) device(s)")
 
@@ -200,6 +208,14 @@ final class LightStateManager: ObservableObject {
         } catch {
             logger.error("Discovery failed: \(error.localizedDescription)")
             lastError = "Discovery failed: \(error.localizedDescription)"
+            scheduleRetryDiscovery()
+        }
+    }
+
+    private func scheduleRetryDiscovery() {
+        Task {
+            try? await Task.sleep(for: .seconds(10))
+            await discoverDevices()
         }
     }
 
