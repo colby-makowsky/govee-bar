@@ -15,6 +15,7 @@ actor GoveeLANController {
         let ip: String
         let sku: String
         let deviceName: String?
+        var lastSeen: Date
 
         var displayName: String {
             deviceName ?? "\(sku) (\(id))"
@@ -150,7 +151,7 @@ actor GoveeLANController {
 
         guard !deviceId.isEmpty, !ip.isEmpty else { return }
 
-        let device = Device(id: deviceId, ip: ip, sku: sku, deviceName: deviceName)
+        let device = Device(id: deviceId, ip: ip, sku: sku, deviceName: deviceName, lastSeen: Date())
         discoveredDevices[deviceId] = device
         logger.info("Discovered device: \(sku) at \(ip)")
         onDeviceDiscovered?(device)
@@ -203,9 +204,8 @@ actor GoveeLANController {
 
     /// Sends a multicast scan to discover devices.
     /// Responses are received by the persistent listener.
+    /// Devices that haven't responded in 15 minutes are pruned.
     func discoverDevices(timeout: TimeInterval = 3.0) async throws -> [Device] {
-        discoveredDevices.removeAll()
-
         // Ensure listener is running
         try startListening()
 
@@ -214,6 +214,10 @@ actor GoveeLANController {
 
         // Wait for responses to arrive at the persistent listener
         try await Task.sleep(for: .seconds(timeout))
+
+        // Prune devices not seen in the last 15 minutes
+        let staleThreshold = Date().addingTimeInterval(-900)
+        discoveredDevices = discoveredDevices.filter { $0.value.lastSeen > staleThreshold }
 
         let devices = Array(discoveredDevices.values)
         logger.info("Discovered \(devices.count) device(s)")
@@ -304,6 +308,9 @@ actor GoveeLANController {
 
     // MARK: - UDP Transport
 
+    /// Maximum number of retry attempts for UDP commands.
+    private let maxRetries = 2
+
     private func sendCommand(
         to device: Device,
         cmd: String,
@@ -318,6 +325,23 @@ actor GoveeLANController {
 
         let jsonData = try JSONSerialization.data(withJSONObject: message)
 
+        var lastError: Error?
+        for attempt in 0...maxRetries {
+            do {
+                try await sendUDPPacket(jsonData, to: device)
+                return
+            } catch {
+                lastError = error
+                logger.warning("UDP send attempt \(attempt + 1)/\(self.maxRetries + 1) failed: \(error.localizedDescription)")
+                if attempt < maxRetries {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+            }
+        }
+        throw lastError!
+    }
+
+    private func sendUDPPacket(_ data: Data, to device: Device) async throws {
         let connection = NWConnection(
             host: NWEndpoint.Host(device.ip),
             port: NWEndpoint.Port(rawValue: commandPort)!,
@@ -328,7 +352,7 @@ actor GoveeLANController {
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    connection.send(content: jsonData, completion: .contentProcessed { error in
+                    connection.send(content: data, completion: .contentProcessed { error in
                         connection.cancel()
                         if let error {
                             continuation.resume(throwing: error)
@@ -337,6 +361,10 @@ actor GoveeLANController {
                         }
                     })
                 case .failed(let error):
+                    connection.cancel()
+                    continuation.resume(throwing: error)
+                case .waiting(let error):
+                    // Connection can't be established (e.g. resource exhaustion)
                     connection.cancel()
                     continuation.resume(throwing: error)
                 default:

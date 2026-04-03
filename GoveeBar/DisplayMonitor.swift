@@ -11,6 +11,10 @@ final class DisplayMonitor {
 
     private var isMonitoring = false
 
+    deinit {
+        stop()
+    }
+
     func start() {
         guard !isMonitoring else { return }
         isMonitoring = true

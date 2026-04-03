@@ -127,11 +127,14 @@ final class LightStateManager: ObservableObject {
     /// Periodically requests device status as a complement to event-driven updates.
     /// Some state changes may not trigger a broadcast, so this catches stragglers.
     private func startStatusPolling() {
-        statusPollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+        guard statusPollTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.pollDeviceStatus()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        statusPollTimer = timer
     }
 
     private func pollDeviceStatus() async {
@@ -206,12 +209,22 @@ final class LightStateManager: ObservableObject {
         logger.info("Selected device: \(id)")
     }
 
+    private func stopTimers() {
+        statusPollTimer?.invalidate()
+        statusPollTimer = nil
+        rediscoveryTimer?.invalidate()
+        rediscoveryTimer = nil
+    }
+
     private func startPeriodicRediscovery() {
-        rediscoveryTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+        guard rediscoveryTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.discoverDevices()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        rediscoveryTimer = timer
     }
 
     // MARK: - Light Toggle
@@ -235,6 +248,19 @@ final class LightStateManager: ObservableObject {
         logger.info("Screen locked: \(locked)")
         screenLocked = locked
         guard isReady else { return }
+
+        if locked {
+            // Pause polling while locked to prevent socket exhaustion overnight
+            stopTimers()
+        } else {
+            // On unlock, restart polling and re-discover in case network state changed
+            Task {
+                await discoverDevices()
+                startPeriodicRediscovery()
+                startStatusPolling()
+            }
+        }
+
         manualOverride = nil
         enforceDesiredState()
     }

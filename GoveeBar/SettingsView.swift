@@ -3,14 +3,12 @@ import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject var stateManager: LightStateManager
-    @AppStorage("launchAtLogin") private var launchAtLogin = true
     @AppStorage("automaticControl") private var automaticControl = true
     @State private var selectedTab = "general"
 
     var body: some View {
         TabView(selection: $selectedTab) {
             GeneralSettingsView(
-                launchAtLogin: $launchAtLogin,
                 automaticControl: $automaticControl,
                 stateManager: stateManager
             )
@@ -41,9 +39,9 @@ struct SettingsView: View {
 // MARK: - General Settings
 
 struct GeneralSettingsView: View {
-    @Binding var launchAtLogin: Bool
     @Binding var automaticControl: Bool
     @ObservedObject var stateManager: LightStateManager
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -74,6 +72,7 @@ struct GeneralSettingsView: View {
         .padding(30)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
             stateManager.automaticControlEnabled = automaticControl
         }
     }
@@ -87,6 +86,8 @@ struct GeneralSettingsView: View {
             }
         } catch {
             print("Failed to \(enabled ? "enable" : "disable") launch at login: \(error)")
+            // Revert toggle to actual system state
+            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 }

@@ -29,8 +29,13 @@ struct MenuBarIcon: View {
             .renderingMode(.template)
     }
 
+    private var deviceAvailable: Bool {
+        guard let id = stateManager.selectedDeviceID else { return false }
+        return stateManager.devices.contains { $0.id == id }
+    }
+
     private var iconName: String {
-        if !stateManager.displayConnected {
+        if !stateManager.displayConnected || !deviceAvailable {
             return "MenuBarIconDisabled"
         } else if stateManager.lightsOn {
             return "MenuBarIconOn"
