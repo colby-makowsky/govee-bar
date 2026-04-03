@@ -1,6 +1,7 @@
 import Foundation
+import AppKit
 
-/// Monitors macOS screen lock/unlock events via DistributedNotificationCenter.
+/// Monitors macOS screen lock/unlock and sleep/wake events.
 final class LockMonitor {
     var onLockStateChanged: ((Bool) -> Void)?
 
@@ -25,12 +26,43 @@ final class LockMonitor {
             name: NSNotification.Name("com.apple.screenIsUnlocked"),
             object: nil
         )
+
+        let wsnc = NSWorkspace.shared.notificationCenter
+
+        wsnc.addObserver(
+            self,
+            selector: #selector(systemWillSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+
+        wsnc.addObserver(
+            self,
+            selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+
+        wsnc.addObserver(
+            self,
+            selector: #selector(screensDidSleep),
+            name: NSWorkspace.screensDidSleepNotification,
+            object: nil
+        )
+
+        wsnc.addObserver(
+            self,
+            selector: #selector(screensDidWake),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
     }
 
     func stop() {
         guard isMonitoring else { return }
         isMonitoring = false
         DistributedNotificationCenter.default().removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     @objc private func screenDidLock() {
@@ -43,6 +75,28 @@ final class LockMonitor {
         DispatchQueue.main.async { [weak self] in
             self?.onLockStateChanged?(false)
         }
+    }
+
+    @objc private func systemWillSleep() {
+        DispatchQueue.main.async { [weak self] in
+            self?.onLockStateChanged?(true)
+        }
+    }
+
+    @objc private func systemDidWake() {
+        // On wake, the screen is typically locked — the unlock notification
+        // will fire separately if/when the user authenticates. So we don't
+        // set locked=false here; we let screenDidUnlock handle that.
+    }
+
+    @objc private func screensDidSleep() {
+        DispatchQueue.main.async { [weak self] in
+            self?.onLockStateChanged?(true)
+        }
+    }
+
+    @objc private func screensDidWake() {
+        // Same as systemDidWake — wait for unlock notification
     }
 
     deinit {
