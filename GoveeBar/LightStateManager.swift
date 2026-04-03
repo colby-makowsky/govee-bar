@@ -249,20 +249,22 @@ final class LightStateManager: ObservableObject {
         screenLocked = locked
         guard isReady else { return }
 
+        manualOverride = nil
+
         if locked {
             // Pause polling while locked to prevent socket exhaustion overnight
             stopTimers()
+            enforceDesiredState()
         } else {
-            // On unlock, restart polling and re-discover in case network state changed
+            // On unlock, re-discover first so device list is populated,
+            // then enforce desired state and restart timers
             Task {
                 await discoverDevices()
+                enforceDesiredState()
                 startPeriodicRediscovery()
                 startStatusPolling()
             }
         }
-
-        manualOverride = nil
-        enforceDesiredState()
     }
 
     // MARK: - State Evaluation

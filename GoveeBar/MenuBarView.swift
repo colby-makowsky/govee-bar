@@ -18,7 +18,6 @@ struct MenuBarView: View {
         } label: {
             Text(stateManager.lightsOn ? "Turn Lights Off" : "Turn Lights On")
         }
-        .keyboardShortcut("t", modifiers: .command)
 
         Divider()
 
@@ -75,13 +74,11 @@ struct MenuBarView: View {
                 }
             }
         }
-        .keyboardShortcut(",", modifiers: .command)
 
         Divider()
 
         Button("Quit Govee Bar") {
             NSApplication.shared.terminate(nil)
         }
-        .keyboardShortcut("q", modifiers: .command)
     }
 }

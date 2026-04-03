@@ -311,6 +311,65 @@ actor GoveeLANController {
     /// Maximum number of retry attempts for UDP commands.
     private let maxRetries = 2
 
+    /// Persistent command connection, keyed by device IP.
+    /// Reused across sends to avoid exhausting kernel NECP flow resources.
+    private var commandConnection: NWConnection?
+    private var commandConnectionIP: String?
+
+    private func getOrCreateConnection(to device: Device) async throws -> NWConnection {
+        // Reuse existing connection if it's for the same device and still usable
+        if let conn = commandConnection, commandConnectionIP == device.ip,
+           conn.state == .ready {
+            return conn
+        }
+
+        // Tear down old connection
+        commandConnection?.cancel()
+        commandConnection = nil
+        commandConnectionIP = nil
+
+        let connection = NWConnection(
+            host: NWEndpoint.Host(device.ip),
+            port: NWEndpoint.Port(rawValue: commandPort)!,
+            using: .udp
+        )
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { [weak self] state in
+                switch state {
+                case .ready:
+                    continuation.resume()
+                    // Clear handler after initial setup to avoid future resume calls
+                    connection.stateUpdateHandler = { failedState in
+                        if case .failed = failedState {
+                            Task { await self?.resetCommandConnection() }
+                        } else if case .waiting = failedState {
+                            Task { await self?.resetCommandConnection() }
+                        }
+                    }
+                case .failed(let error):
+                    continuation.resume(throwing: error)
+                case .waiting(let error):
+                    connection.cancel()
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+            connection.start(queue: .global())
+        }
+
+        commandConnection = connection
+        commandConnectionIP = device.ip
+        return connection
+    }
+
+    private func resetCommandConnection() {
+        commandConnection?.cancel()
+        commandConnection = nil
+        commandConnectionIP = nil
+    }
+
     private func sendCommand(
         to device: Device,
         cmd: String,
@@ -333,6 +392,8 @@ actor GoveeLANController {
             } catch {
                 lastError = error
                 logger.warning("UDP send attempt \(attempt + 1)/\(self.maxRetries + 1) failed: \(error.localizedDescription)")
+                // Reset connection on failure so next attempt creates a fresh one
+                resetCommandConnection()
                 if attempt < maxRetries {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
@@ -342,36 +403,16 @@ actor GoveeLANController {
     }
 
     private func sendUDPPacket(_ data: Data, to device: Device) async throws {
-        let connection = NWConnection(
-            host: NWEndpoint.Host(device.ip),
-            port: NWEndpoint.Port(rawValue: commandPort)!,
-            using: .udp
-        )
+        let connection = try await getOrCreateConnection(to: device)
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    connection.send(content: data, completion: .contentProcessed { error in
-                        connection.cancel()
-                        if let error {
-                            continuation.resume(throwing: error)
-                        } else {
-                            continuation.resume()
-                        }
-                    })
-                case .failed(let error):
-                    connection.cancel()
+            connection.send(content: data, completion: .contentProcessed { error in
+                if let error {
                     continuation.resume(throwing: error)
-                case .waiting(let error):
-                    // Connection can't be established (e.g. resource exhaustion)
-                    connection.cancel()
-                    continuation.resume(throwing: error)
-                default:
-                    break
+                } else {
+                    continuation.resume()
                 }
-            }
-            connection.start(queue: .global())
+            })
         }
     }
 }
