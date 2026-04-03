@@ -56,6 +56,13 @@ final class LockMonitor {
             name: NSWorkspace.screensDidWakeNotification,
             object: nil
         )
+
+        wsnc.addObserver(
+            self,
+            selector: #selector(systemWillPowerOff),
+            name: NSWorkspace.willPowerOffNotification,
+            object: nil
+        )
     }
 
     func stop() {
@@ -97,6 +104,12 @@ final class LockMonitor {
 
     @objc private func screensDidWake() {
         // Same as systemDidWake — wait for unlock notification
+    }
+
+    @objc private func systemWillPowerOff() {
+        DispatchQueue.main.async { [weak self] in
+            self?.onLockStateChanged?(true)
+        }
     }
 
     deinit {
