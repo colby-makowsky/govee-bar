@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @ObservedObject var stateManager: LightStateManager
+    var stateManager: LightStateManager
     @Environment(\.openSettings) private var openSettings
 
     private var deviceName: String {
@@ -62,15 +62,14 @@ struct MenuBarView: View {
                 NSApp.applicationIconImage = symbol.withSymbolConfiguration(config) ?? symbol
             }
             NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             openSettings()
 
             // Bring existing settings window to front
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                for window in NSApp.windows {
-                    if window.isVisible && window.canBecomeKey {
-                        window.makeKeyAndOrderFront(nil)
-                    }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(200))
+                for window in NSApp.windows where window.isVisible && window.canBecomeKey {
+                    window.makeKeyAndOrderFront(nil)
                 }
             }
         }

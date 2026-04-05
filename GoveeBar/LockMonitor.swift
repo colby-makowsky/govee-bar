@@ -1,5 +1,5 @@
-import Foundation
 import AppKit
+import Foundation
 
 /// Monitors macOS screen lock/unlock and sleep/wake events.
 final class LockMonitor {

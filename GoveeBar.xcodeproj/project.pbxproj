@@ -1,0 +1,364 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		126826E12C44EE5C534D9CFE /* LockMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC2A068720B093FC42345DE /* LockMonitor.swift */; };
+		2CB3F068EE7C31093B1DE911 /* DisplayMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2ACC529D3B65D72BB5453E /* DisplayMonitor.swift */; };
+		3E5445302C4F08D4E6D3BB61 /* GoveeBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2744C090B08083270FB9BC /* GoveeBarApp.swift */; };
+		7C9B0FD6FBF06CD70587D660 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 14A56EBC1CEE3B470B381052 /* Assets.xcassets */; };
+		940DE978A1B459976200B39F /* GoveeLANController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC8C1FB1270A5B52E753F28 /* GoveeLANController.swift */; };
+		CA28DF3C4B32098EB4B17C42 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877279978F11883A586DE9 /* MenuBarView.swift */; };
+		CBEC22957541F5FBBB4461F7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CA1A3E28CD38A49CCB6744 /* SettingsView.swift */; };
+		CF88BAB31B147B78A552E323 /* LightStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA886C28960993E86A4F6CA5 /* LightStateManager.swift */; };
+		FD9D3598D7F4CD3065A516F4 /* GoveeCloudController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3851C634FEABB932AC47010B /* GoveeCloudController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0D2ACC529D3B65D72BB5453E /* DisplayMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayMonitor.swift; sourceTree = "<group>"; };
+		121C6FE90B333092FB70527D /* GoveeBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GoveeBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		14A56EBC1CEE3B470B381052 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		27CA1A3E28CD38A49CCB6744 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3851C634FEABB932AC47010B /* GoveeCloudController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoveeCloudController.swift; sourceTree = "<group>"; };
+		5CC8C1FB1270A5B52E753F28 /* GoveeLANController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoveeLANController.swift; sourceTree = "<group>"; };
+		9CC2A068720B093FC42345DE /* LockMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockMonitor.swift; sourceTree = "<group>"; };
+		CB2744C090B08083270FB9BC /* GoveeBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoveeBarApp.swift; sourceTree = "<group>"; };
+		EA877279978F11883A586DE9 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		FA886C28960993E86A4F6CA5 /* LightStateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightStateManager.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2FD2B0CF0CBA24EFBE008105 = {
+			isa = PBXGroup;
+			children = (
+				858F5B8771BC515B80A70336 /* GoveeBar */,
+				676AACDC2521D78EC8F06858 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		676AACDC2521D78EC8F06858 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				121C6FE90B333092FB70527D /* GoveeBar.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		858F5B8771BC515B80A70336 /* GoveeBar */ = {
+			isa = PBXGroup;
+			children = (
+				14A56EBC1CEE3B470B381052 /* Assets.xcassets */,
+				0D2ACC529D3B65D72BB5453E /* DisplayMonitor.swift */,
+				CB2744C090B08083270FB9BC /* GoveeBarApp.swift */,
+				3851C634FEABB932AC47010B /* GoveeCloudController.swift */,
+				5CC8C1FB1270A5B52E753F28 /* GoveeLANController.swift */,
+				FA886C28960993E86A4F6CA5 /* LightStateManager.swift */,
+				9CC2A068720B093FC42345DE /* LockMonitor.swift */,
+				EA877279978F11883A586DE9 /* MenuBarView.swift */,
+				27CA1A3E28CD38A49CCB6744 /* SettingsView.swift */,
+			);
+			path = GoveeBar;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4648B31FBAA2C1353183F83A /* GoveeBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56A7B16E71EF7C9038B65619 /* Build configuration list for PBXNativeTarget "GoveeBar" */;
+			buildPhases = (
+				BE649261D5E60B3B68B08F0A /* SwiftLint */,
+				190712A064E1C30E11F9B0D5 /* Sources */,
+				426F1570342154136389F6AC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GoveeBar;
+			packageProductDependencies = (
+			);
+			productName = GoveeBar;
+			productReference = 121C6FE90B333092FB70527D /* GoveeBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C8DB5EA782386387D5416CEF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 7D6E977761DB4FF552C906AF /* Build configuration list for PBXProject "GoveeBar" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2FD2B0CF0CBA24EFBE008105;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 676AACDC2521D78EC8F06858 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4648B31FBAA2C1353183F83A /* GoveeBar */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		426F1570342154136389F6AC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C9B0FD6FBF06CD70587D660 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		BE649261D5E60B3B68B08F0A /* SwiftLint */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = SwiftLint;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if which swiftlint > /dev/null; then\n  swiftlint\nelse\n  echo \"warning: SwiftLint not installed — run 'brew install swiftlint'\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		190712A064E1C30E11F9B0D5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2CB3F068EE7C31093B1DE911 /* DisplayMonitor.swift in Sources */,
+				3E5445302C4F08D4E6D3BB61 /* GoveeBarApp.swift in Sources */,
+				FD9D3598D7F4CD3065A516F4 /* GoveeCloudController.swift in Sources */,
+				940DE978A1B459976200B39F /* GoveeLANController.swift in Sources */,
+				CF88BAB31B147B78A552E323 /* LightStateManager.swift in Sources */,
+				126826E12C44EE5C534D9CFE /* LockMonitor.swift in Sources */,
+				CA28DF3C4B32098EB4B17C42 /* MenuBarView.swift in Sources */,
+				CBEC22957541F5FBBB4461F7 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3371B58AE51109D0640DC65E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GoveeBar/GoveeBar.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.govee-bar.GoveeBar";
+				PRODUCT_NAME = "Govee Bar";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		63D48242762558A62CC21367 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		BCDE5FA58D7C373A0C4A5DE2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GoveeBar/GoveeBar.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.govee-bar.GoveeBar";
+				PRODUCT_NAME = "Govee Bar";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		F4F9AD2E67659FCED3F27EA4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		56A7B16E71EF7C9038B65619 /* Build configuration list for PBXNativeTarget "GoveeBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BCDE5FA58D7C373A0C4A5DE2 /* Debug */,
+				3371B58AE51109D0640DC65E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7D6E977761DB4FF552C906AF /* Build configuration list for PBXProject "GoveeBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4F9AD2E67659FCED3F27EA4 /* Debug */,
+				63D48242762558A62CC21367 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C8DB5EA782386387D5416CEF /* Project object */;
+}

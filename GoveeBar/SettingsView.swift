@@ -1,10 +1,14 @@
-import SwiftUI
 import ServiceManagement
+import SwiftUI
+
+private enum SettingsTab {
+    case general, devices, connection
+}
 
 struct SettingsView: View {
-    @ObservedObject var stateManager: LightStateManager
+    var stateManager: LightStateManager
     @AppStorage("automaticControl") private var automaticControl = true
-    @State private var selectedTab = "general"
+    @State private var selectedTab = SettingsTab.general
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -15,19 +19,19 @@ struct SettingsView: View {
             .tabItem {
                 Label("General", systemImage: "gear")
             }
-            .tag("general")
+            .tag(SettingsTab.general)
 
             DeviceSettingsView(stateManager: stateManager)
                 .tabItem {
                     Label("Devices", systemImage: "wifi")
                 }
-                .tag("devices")
+                .tag(SettingsTab.devices)
 
             ConnectionSettingsView(stateManager: stateManager)
                 .tabItem {
                     Label("Connection", systemImage: "network")
                 }
-                .tag("connection")
+                .tag(SettingsTab.connection)
         }
         .frame(width: 500, height: 320)
         .onDisappear {
@@ -40,12 +44,12 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @Binding var automaticControl: Bool
-    @ObservedObject var stateManager: LightStateManager
+    var stateManager: LightStateManager
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsRow("Startup:") {
+            SettingsRow(label: "Startup:") {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Launch Govee Bar at login", isOn: $launchAtLogin)
                         .onChange(of: launchAtLogin) { _, newValue in
@@ -56,7 +60,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            settingsRow("Automation:") {
+            SettingsRow(label: "Automation:") {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Automatic light control", isOn: $automaticControl)
                         .onChange(of: automaticControl) { _, newValue in
@@ -95,11 +99,11 @@ struct GeneralSettingsView: View {
 // MARK: - Device Settings
 
 struct DeviceSettingsView: View {
-    @ObservedObject var stateManager: LightStateManager
+    var stateManager: LightStateManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsRow("Devices:") {
+            SettingsRow(label: "Devices:") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button {
@@ -154,7 +158,7 @@ struct DeviceSettingsView: View {
             }
 
             if let error = stateManager.lastError {
-                settingsRow("") {
+                SettingsRow(label: "") {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                         .font(.callout)
@@ -171,15 +175,15 @@ struct DeviceSettingsView: View {
 // MARK: - Connection Settings
 
 struct ConnectionSettingsView: View {
-    @ObservedObject var stateManager: LightStateManager
+    @Bindable var stateManager: LightStateManager
     @State private var apiKeyInput = ""
     @State private var showAPIKey = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsRow("Method:") {
+            SettingsRow(label: "Method:") {
                 VStack(alignment: .leading, spacing: 4) {
-                    Picker("", selection: $stateManager.controlMethod) {
+                    Picker("Connection method", selection: $stateManager.controlMethod) {
                         ForEach(LightStateManager.ControlMethod.allCases, id: \.self) { method in
                             Text(method.rawValue).tag(method)
                         }
@@ -192,7 +196,7 @@ struct ConnectionSettingsView: View {
                 }
             }
 
-            settingsRow("API Key:") {
+            SettingsRow(label: "API Key:") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Group {
@@ -205,12 +209,12 @@ struct ConnectionSettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 280)
 
-                        Button {
+                        Button(showAPIKey ? "Hide API key" : "Show API key",
+                               systemImage: showAPIKey ? "eye.slash" : "eye") {
                             showAPIKey.toggle()
-                        } label: {
-                            Image(systemName: showAPIKey ? "eye.slash" : "eye")
                         }
                         .buttonStyle(.borderless)
+                        .labelStyle(.iconOnly)
                         .help(showAPIKey ? "Hide API key" : "Show API key")
                     }
 
@@ -254,16 +258,18 @@ struct ConnectionSettingsView: View {
 
 // MARK: - Layout Helpers
 
-/// Creates a settings row with a right-aligned label and left-aligned content,
-/// matching the native macOS System Settings / Amphetamine style.
-private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
-    HStack(alignment: .top, spacing: 12) {
-        Text(label)
-            .font(.system(.body))
-            .foregroundStyle(.primary)
-            .frame(width: 90, alignment: .trailing)
+private struct SettingsRow<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: Content
 
-        content()
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(label)
+                .font(.system(.body))
+                .foregroundStyle(.primary)
+                .frame(width: 90, alignment: .trailing)
+            content
+        }
     }
 }
 

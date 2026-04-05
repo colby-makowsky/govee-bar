@@ -1,30 +1,32 @@
 import Foundation
-import Combine
+import Observation
 import os.log
 
 /// Combines display and lock signals to determine desired light state,
 /// and sends commands to Govee devices via LAN with cloud API fallback.
 @MainActor
-final class LightStateManager: ObservableObject {
+@Observable
+final class LightStateManager {
     enum ControlMethod: String, CaseIterable {
         case lan = "LAN"
         case cloud = "Cloud API"
         case auto = "Auto (LAN → Cloud)"
     }
 
-    @Published private(set) var lightsOn = false
-    @Published private(set) var displayConnected = false
-    @Published private(set) var screenLocked = false
-    @Published private(set) var devices: [GoveeLANController.Device] = []
-    @Published private(set) var selectedDeviceID: String?
-    @Published private(set) var isDiscovering = false
-    @Published private(set) var lastError: String?
+    private(set) var lightsOn = false
+    private(set) var displayConnected = false
+    private(set) var screenLocked = false
+    private(set) var devices: [GoveeLANController.Device] = []
+    private(set) var selectedDeviceID: String?
+    private(set) var isDiscovering = false
+    private(set) var lastError: String?
+    private(set) var hasAPIKey: Bool = false
 
-    @Published var automaticControlEnabled = true {
+    var automaticControlEnabled = true {
         didSet { if isReady { enforceDesiredState() } }
     }
 
-    @Published var controlMethod: ControlMethod = .auto {
+    var controlMethod: ControlMethod = .auto {
         didSet {
             UserDefaults.standard.set(controlMethod.rawValue, forKey: "controlMethod")
         }
@@ -36,17 +38,19 @@ final class LightStateManager: ObservableObject {
     private let cloudController = GoveeCloudController()
     private let logger = Logger(subsystem: "com.govee-bar", category: "state")
 
-    private var manualOverride: Bool?
-    private var rediscoveryTimer: Timer?
-    private var statusPollTimer: Timer?
+    @ObservationIgnored private var manualOverride: Bool?
+    @ObservationIgnored private var statusPollTask: Task<Void, Never>?
+    @ObservationIgnored private var rediscoveryTask: Task<Void, Never>?
 
     /// True once initial discovery + status check is done.
     /// Prevents the state machine from acting before we know the real device state.
-    private var isReady = false
+    @ObservationIgnored private var isReady = false
 
     /// Tracks whether we're applying our own command, so we can ignore
     /// the resulting status echo from the device.
-    private var isApplyingCommand = false
+    @ObservationIgnored private var isApplyingCommand = false
+
+    private static let apiKeyDefaultsKey = "goveeAPIKey"
 
     init() {
         displayMonitor.onDisplayChanged = { [weak self] connected in
@@ -62,6 +66,11 @@ final class LightStateManager: ObservableObject {
         if let saved = UserDefaults.standard.string(forKey: "controlMethod"),
            let method = ControlMethod(rawValue: saved) {
             controlMethod = method
+        }
+
+        // Load API key status
+        if let key = UserDefaults.standard.string(forKey: Self.apiKeyDefaultsKey), !key.isEmpty {
+            hasAPIKey = true
         }
 
         // Set up event-driven status updates from LAN controller
@@ -99,7 +108,7 @@ final class LightStateManager: ObservableObject {
             // Give the listener a moment to receive the response
             try? await Task.sleep(for: .seconds(1))
         } catch {
-            logger.warning("Initial status check failed: \(error.localizedDescription)")
+            logger.warning("Initial status check failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -116,9 +125,9 @@ final class LightStateManager: ObservableObject {
         if !isReady {
             // During init, just sync our state to match the device — no commands
             lightsOn = status.isOn
-            logger.info("Initial device state: \(status.isOn ? "ON" : "OFF")")
+            logger.info("Initial device state: \(status.isOn ? "ON" : "OFF", privacy: .public)")
         } else if status.isOn != lightsOn {
-            logger.info("External state change detected: lights \(status.isOn ? "ON" : "OFF")")
+            logger.info("External state change detected: lights \(status.isOn ? "ON" : "OFF", privacy: .public)")
             lightsOn = status.isOn
             manualOverride = status.isOn
         }
@@ -127,14 +136,14 @@ final class LightStateManager: ObservableObject {
     /// Periodically requests device status as a complement to event-driven updates.
     /// Some state changes may not trigger a broadcast, so this catches stragglers.
     private func startStatusPolling() {
-        guard statusPollTimer == nil else { return }
-        let timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.pollDeviceStatus()
+        guard statusPollTask == nil else { return }
+        statusPollTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
+                await pollDeviceStatus()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        statusPollTimer = timer
     }
 
     private func pollDeviceStatus() async {
@@ -151,10 +160,6 @@ final class LightStateManager: ObservableObject {
     }
 
     // MARK: - API Key
-
-    @Published private(set) var hasAPIKey: Bool = false
-
-    private static let apiKeyDefaultsKey = "goveeAPIKey"
 
     func loadAPIKeyIfNeeded() {
         if let key = UserDefaults.standard.string(forKey: Self.apiKeyDefaultsKey), !key.isEmpty {
@@ -206,7 +211,7 @@ final class LightStateManager: ObservableObject {
                 selectDevice(first.id)
             }
         } catch {
-            logger.error("Discovery failed: \(error.localizedDescription)")
+            logger.error("Discovery failed: \(error.localizedDescription, privacy: .public)")
             lastError = "Discovery failed: \(error.localizedDescription)"
             scheduleRetryDiscovery()
         }
@@ -222,25 +227,25 @@ final class LightStateManager: ObservableObject {
     func selectDevice(_ id: String) {
         selectedDeviceID = id
         UserDefaults.standard.set(id, forKey: "selectedDeviceID")
-        logger.info("Selected device: \(id)")
+        logger.info("Selected device: \(id, privacy: .public)")
     }
 
     private func stopTimers() {
-        statusPollTimer?.invalidate()
-        statusPollTimer = nil
-        rediscoveryTimer?.invalidate()
-        rediscoveryTimer = nil
+        statusPollTask?.cancel()
+        statusPollTask = nil
+        rediscoveryTask?.cancel()
+        rediscoveryTask = nil
     }
 
     private func startPeriodicRediscovery() {
-        guard rediscoveryTimer == nil else { return }
-        let timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.discoverDevices()
+        guard rediscoveryTask == nil else { return }
+        rediscoveryTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                guard !Task.isCancelled else { break }
+                await discoverDevices()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        rediscoveryTimer = timer
     }
 
     // MARK: - Light Toggle
@@ -300,7 +305,7 @@ final class LightStateManager: ObservableObject {
         guard lightsOn != desired else { return }
 
         lightsOn = desired
-        logger.info("Lights → \(desired ? "ON" : "OFF")")
+        logger.info("Lights → \(desired ? "ON" : "OFF", privacy: .public)")
         Task {
             await sendLightCommand(on: desired)
         }
@@ -344,7 +349,7 @@ final class LightStateManager: ObservableObject {
             }
             lastError = nil
         } catch {
-            logger.error("LAN failed: \(error.localizedDescription)")
+            logger.error("LAN failed: \(error.localizedDescription, privacy: .public)")
             if cloudFallback {
                 logger.info("Falling back to cloud API")
                 await sendViaCloud(on: on, device: device)
@@ -364,7 +369,7 @@ final class LightStateManager: ObservableObject {
             }
             lastError = nil
         } catch {
-            logger.error("Cloud failed: \(error.localizedDescription)")
+            logger.error("Cloud failed: \(error.localizedDescription, privacy: .public)")
             lastError = "Cloud: \(error.localizedDescription)"
         }
     }

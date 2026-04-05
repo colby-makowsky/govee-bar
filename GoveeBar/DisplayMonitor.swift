@@ -1,6 +1,6 @@
-import Foundation
-import CoreGraphics
 import AppKit
+import CoreGraphics
+import Foundation
 
 /// Monitors for Apple Studio Display connection/disconnection events.
 final class DisplayMonitor {
@@ -19,18 +19,10 @@ final class DisplayMonitor {
         guard !isMonitoring else { return }
         isMonitoring = true
 
-        CGDisplayRegisterReconfigurationCallback({ _, flags, userInfo in
-            guard let userInfo else { return }
-            let monitor = Unmanaged<DisplayMonitor>.fromOpaque(userInfo).takeUnretainedValue()
-            // Only react once the reconfiguration is complete
-            if flags.contains(.setMainFlag) || flags.contains(.addFlag) || flags.contains(.removeFlag) || flags.contains(.enabledFlag) || flags.contains(.disabledFlag) {
-                if !flags.contains(.beginConfigurationFlag) {
-                    DispatchQueue.main.async {
-                        monitor.checkDisplayState()
-                    }
-                }
-            }
-        }, Unmanaged.passUnretained(self).toOpaque())
+        CGDisplayRegisterReconfigurationCallback(
+            displayReconfigurationCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
 
         checkDisplayState()
     }
@@ -38,7 +30,12 @@ final class DisplayMonitor {
     func stop() {
         guard isMonitoring else { return }
         isMonitoring = false
-        CGDisplayRemoveReconfigurationCallback({ _, _, _ in }, nil)
+
+        // Must pass the same function pointer and context used during registration
+        CGDisplayRemoveReconfigurationCallback(
+            displayReconfigurationCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
     }
 
     func checkDisplayState() {
@@ -58,7 +55,7 @@ final class DisplayMonitor {
             let displayID = onlineDisplays[i]
             let vendorID = CGDisplayVendorNumber(displayID)
 
-            // Apple Studio Display has vendor ID 0x610 (Apple) and is an external display
+            // Apple Studio Display has vendor ID 0x610 and is an external display
             if vendorID == appleVendorID && CGDisplayIsBuiltin(displayID) == 0 {
                 return true
             }
@@ -68,3 +65,23 @@ final class DisplayMonitor {
     }
 }
 
+/// File-level C-compatible callback. A global (context-free) function is required
+/// so that the same pointer can be passed to both register and unregister calls.
+private func displayReconfigurationCallback(
+    _ displayID: CGDirectDisplayID,
+    _ flags: CGDisplayChangeSummaryFlags,
+    _ userInfo: UnsafeMutableRawPointer?
+) {
+    guard let userInfo else { return }
+    let monitor = Unmanaged<DisplayMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+
+    // Only react once the reconfiguration is complete
+    guard !flags.contains(.beginConfigurationFlag) else { return }
+
+    if flags.contains(.setMainFlag) || flags.contains(.addFlag) || flags.contains(.removeFlag) ||
+       flags.contains(.enabledFlag) || flags.contains(.disabledFlag) {
+        DispatchQueue.main.async {
+            monitor.checkDisplayState()
+        }
+    }
+}

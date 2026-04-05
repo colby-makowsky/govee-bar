@@ -22,11 +22,15 @@ actor GoveeLANController {
         }
     }
 
+    struct RGB: Sendable, Equatable {
+        let r, g, b: Int
+    }
+
     struct DeviceStatus: Sendable {
         let deviceId: String
         let isOn: Bool
         let brightness: Int?
-        let color: (r: Int, g: Int, b: Int)?
+        let color: RGB?
         let colorTemperature: Int?
     }
 
@@ -129,7 +133,7 @@ actor GoveeLANController {
             return
         }
 
-        logger.debug("Received message: cmd=\(cmd)")
+        logger.debug("Received message: cmd=\(cmd, privacy: .public)")
 
         switch cmd {
         case "scan":
@@ -137,7 +141,7 @@ actor GoveeLANController {
         case "devStatus":
             handleStatusMessage(msg: msg)
         default:
-            logger.debug("Unhandled command: \(cmd)")
+            logger.debug("Unhandled command: \(cmd, privacy: .public)")
         }
     }
 
@@ -153,25 +157,23 @@ actor GoveeLANController {
 
         let device = Device(id: deviceId, ip: ip, sku: sku, deviceName: deviceName, lastSeen: Date())
         discoveredDevices[deviceId] = device
-        logger.info("Discovered device: \(sku) at \(ip)")
+        logger.info("Discovered device: \(sku, privacy: .public) at \(ip, privacy: .public)")
         onDeviceDiscovered?(device)
     }
 
     private func handleStatusMessage(msg: [String: Any]) {
         guard let data = msg["data"] as? [String: Any] else { return }
 
-        // The device ID comes from the scan data we cached, or from the message
-        // Status messages include onOff, brightness, color, colorTemInKelvin
         let onOff = data["onOff"] as? Int
         let brightness = data["brightness"] as? Int
         let colorTemp = data["colorTemInKelvin"] as? Int
 
-        var color: (Int, Int, Int)?
+        var color: RGB?
         if let colorData = data["color"] as? [String: Any],
            let r = colorData["r"] as? Int,
            let g = colorData["g"] as? Int,
            let b = colorData["b"] as? Int {
-            color = (r, g, b)
+            color = RGB(r: r, g: g, b: b)
         }
 
         // Try to identify which device this came from
@@ -195,7 +197,7 @@ actor GoveeLANController {
                 color: color,
                 colorTemperature: colorTemp
             )
-            logger.info("Device \(deviceId) status: on=\(isOn == 1), brightness=\(brightness ?? -1)")
+            logger.info("Device \(deviceId, privacy: .public) status: on=\(isOn == 1), brightness=\(brightness ?? -1)")
             onDeviceStatusUpdate?(status)
         }
     }
@@ -275,18 +277,18 @@ actor GoveeLANController {
 
     func turnOn(device: Device) async throws {
         try await sendCommand(to: device, cmd: "turn", data: ["value": 1])
-        logger.info("Turned ON: \(device.displayName)")
+        logger.info("Turned ON: \(device.displayName, privacy: .public)")
     }
 
     func turnOff(device: Device) async throws {
         try await sendCommand(to: device, cmd: "turn", data: ["value": 0])
-        logger.info("Turned OFF: \(device.displayName)")
+        logger.info("Turned OFF: \(device.displayName, privacy: .public)")
     }
 
     func setBrightness(device: Device, value: Int) async throws {
         let clamped = max(1, min(100, value))
         try await sendCommand(to: device, cmd: "brightness", data: ["value": clamped])
-        logger.info("Brightness → \(clamped): \(device.displayName)")
+        logger.info("Brightness → \(clamped): \(device.displayName, privacy: .public)")
     }
 
     func setColor(device: Device, r: Int, g: Int, b: Int) async throws {
@@ -294,7 +296,7 @@ actor GoveeLANController {
             "color": ["r": r, "g": g, "b": b],
             "colorTemInKelvin": 0
         ])
-        logger.info("Color → (\(r),\(g),\(b)): \(device.displayName)")
+        logger.info("Color → (\(r),\(g),\(b)): \(device.displayName, privacy: .public)")
     }
 
     func setColorTemperature(device: Device, kelvin: Int) async throws {
@@ -303,7 +305,7 @@ actor GoveeLANController {
             "color": ["r": 0, "g": 0, "b": 0],
             "colorTemInKelvin": clamped
         ])
-        logger.info("Color temp → \(clamped)K: \(device.displayName)")
+        logger.info("Color temp → \(clamped)K: \(device.displayName, privacy: .public)")
     }
 
     // MARK: - UDP Transport
@@ -340,11 +342,12 @@ actor GoveeLANController {
                 case .ready:
                     continuation.resume()
                     // Clear handler after initial setup to avoid future resume calls
-                    connection.stateUpdateHandler = { failedState in
+                    connection.stateUpdateHandler = { [weak self] failedState in
+                        guard let self else { return }
                         if case .failed = failedState {
-                            Task { await self?.resetCommandConnection() }
+                            Task { await self.resetCommandConnection() }
                         } else if case .waiting = failedState {
-                            Task { await self?.resetCommandConnection() }
+                            Task { await self.resetCommandConnection() }
                         }
                     }
                 case .failed(let error):
@@ -391,7 +394,7 @@ actor GoveeLANController {
                 return
             } catch {
                 lastError = error
-                logger.warning("UDP send attempt \(attempt + 1)/\(self.maxRetries + 1) failed: \(error.localizedDescription)")
+                logger.warning("UDP send attempt \(attempt + 1)/\(self.maxRetries + 1) failed: \(error.localizedDescription, privacy: .public)")
                 // Reset connection on failure so next attempt creates a fresh one
                 resetCommandConnection()
                 if attempt < maxRetries {
@@ -399,7 +402,7 @@ actor GoveeLANController {
                 }
             }
         }
-        throw lastError!
+        throw lastError ?? CancellationError()
     }
 
     private func sendUDPPacket(_ data: Data, to device: Device) async throws {

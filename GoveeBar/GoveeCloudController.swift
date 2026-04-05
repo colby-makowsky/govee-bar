@@ -22,7 +22,8 @@ actor GoveeCloudController {
         }
     }
 
-    private let baseURL = "https://openapi.api.govee.com/router/api/v1"
+    private static let devicesURL = URL(string: "https://openapi.api.govee.com/router/api/v1/user/devices")!
+    private static let controlURL = URL(string: "https://openapi.api.govee.com/router/api/v1/device/control")!
     private let logger = Logger(subsystem: "com.govee-bar", category: "cloud")
 
     private var apiKey: String?
@@ -38,7 +39,7 @@ actor GoveeCloudController {
             throw CloudError.noAPIKey
         }
 
-        var request = URLRequest(url: URL(string: "\(baseURL)/user/devices")!)
+        var request = URLRequest(url: Self.devicesURL)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "Govee-API-Key")
@@ -116,7 +117,7 @@ actor GoveeCloudController {
 
         let jsonData = try JSONSerialization.data(withJSONObject: body)
 
-        var request = URLRequest(url: URL(string: "\(baseURL)/device/control")!)
+        var request = URLRequest(url: Self.controlURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "Govee-API-Key")
